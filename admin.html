@@ -323,9 +323,47 @@ html{font-size:14px;}
   table{font-size:12px;}
   td,th{padding:8px 10px;}
 }
+
+/* ── ADMIN LOGIN ── */
+#admin-login{
+  position:fixed;inset:0;background:linear-gradient(160deg,#060f1e 0%,#0d1f3c 100%);
+  display:flex;align-items:center;justify-content:center;z-index:9999;
+  font-family:'Inter',sans-serif;
+}
+.login-card{
+  background:#111f35;border:1px solid #1e3a5f;border-radius:20px;
+  padding:40px 36px;width:100%;max-width:400px;
+  box-shadow:0 20px 60px rgba(0,0,0,.5);
+}
+.login-logo{width:56px;height:56px;background:#2563eb;border-radius:14px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:22px;font-weight:800;color:#fff;margin:0 auto 16px;
+  font-family:'Playfair Display',serif;}
+.login-title{font-size:22px;font-weight:700;color:#e8f0fe;text-align:center;margin-bottom:4px;}
+.login-sub{font-size:13px;color:#4a6a99;text-align:center;margin-bottom:28px;}
+.login-fg{margin-bottom:16px;}
+.login-fg label{display:block;font-size:10px;font-weight:700;letter-spacing:.5px;
+  text-transform:uppercase;color:#4a6a99;margin-bottom:6px;}
+.login-fg input{width:100%;background:#162540;border:1.5px solid #1e3a5f;
+  border-radius:10px;padding:13px 14px;color:#e8f0fe;font-size:15px;
+  font-family:'Inter',sans-serif;outline:none;transition:border-color .15s;}
+.login-fg input:focus{border-color:#2563eb;}
+.login-btn{width:100%;padding:14px;background:#2563eb;color:#fff;border:none;
+  border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;
+  font-family:'Inter',sans-serif;margin-top:8px;transition:background .15s;}
+.login-btn:hover{background:#1d4ed8;}
+.login-bio{width:100%;padding:13px;background:transparent;color:#8ba8d4;
+  border:1.5px solid #1e3a5f;border-radius:12px;font-size:14px;font-weight:600;
+  cursor:pointer;font-family:'Inter',sans-serif;margin-top:10px;
+  display:none;align-items:center;justify-content:center;gap:8px;}
+.login-bio:hover{border-color:#2563eb;color:#3b82f6;}
+.login-err{font-size:13px;color:#ef4444;text-align:center;margin-top:10px;
+  min-height:20px;font-weight:600;}
+.login-footer{font-size:11px;color:#2d4a70;text-align:center;margin-top:20px;}
 </style>
 </head>
 <body>
+
 
 <!-- SIDEBAR — icons only, like Analysis Pro -->
 <div id="sidebar">
@@ -1126,6 +1164,140 @@ async function clearAllData(){showConfirm('Clear All Data','Erase ALL data perma
 function showToast(msg,type='info'){const t=document.getElementById('toast');const colors={info:'background:#eff6ff;color:#2563eb;border:1px solid rgba(37,99,235,.2)',success:'background:#f0fdf4;color:#059669;border:1px solid rgba(5,150,105,.2)',danger:'background:#fef2f2;color:#dc2626;border:1px solid rgba(220,38,38,.2)',warn:'background:#fffbeb;color:#d97706;border:1px solid rgba(217,119,6,.2)'};t.style.cssText=`position:fixed;top:76px;right:20px;z-index:999;padding:11px 18px;border-radius:8px;font-size:13px;font-weight:600;pointer-events:none;box-shadow:0 4px 6px rgba(0,0,0,.07);font-family:Inter,sans-serif;${colors[type]||colors.info}`;t.textContent=msg;t.style.opacity='1';clearTimeout(t._t);t._t=setTimeout(()=>t.style.opacity='0',3000);}
 
 // ════════════════════════════
+// ════════════════════════════
+// ADMIN AUTH
+// ════════════════════════════
+const ADMIN_USER = 'admin';
+const ADMIN_PASS = 'LuminGroup2025!';
+const SESSION_KEY = 'qc_admin_session';
+const SESSION_HOURS = 24;
+let adminAttempts = 0;
+let biometricCredId = null;
+
+function checkAdminSession(){
+  try{
+    const s = localStorage.getItem(SESSION_KEY);
+    if(s){
+      const sess = JSON.parse(s);
+      if(sess.expires > Date.now()){
+        document.getElementById('admin-login').style.display = 'none';
+        checkBiometricAvailable();
+        return true;
+      }
+    }
+  }catch(e){}
+  checkBiometricAvailable();
+  return false;
+}
+
+function saveAdminSession(){
+  const expires = Date.now() + SESSION_HOURS * 60 * 60 * 1000;
+  localStorage.setItem(SESSION_KEY, JSON.stringify({expires}));
+}
+
+function doAdminLogin(){
+  const user = document.getElementById('login-user').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  const err = document.getElementById('login-err');
+
+  if(adminAttempts >= 5){
+    err.textContent = 'Too many attempts. Please wait 30 minutes.';
+    return;
+  }
+
+  if(user === ADMIN_USER && pass === ADMIN_PASS){
+    adminAttempts = 0;
+    saveAdminSession();
+    document.getElementById('admin-login').style.display = 'none';
+    // Offer biometric registration
+    offerBiometric();
+    syncAll();
+  } else {
+    adminAttempts++;
+    const left = 5 - adminAttempts;
+    err.textContent = left > 0
+      ? `Wrong username or password. ${left} attempt${left!==1?'s':''} remaining.`
+      : 'Account locked for 30 minutes.';
+    document.getElementById('login-pass').value = '';
+    if(adminAttempts >= 5){
+      setTimeout(()=>{ adminAttempts=0; err.textContent=''; }, 30*60*1000);
+    }
+  }
+}
+
+async function checkBiometricAvailable(){
+  try{
+    const credId = localStorage.getItem('qc_admin_biometric');
+    if(credId && window.PublicKeyCredential){
+      const avail = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+      if(avail){
+        document.getElementById('bio-btn').style.display = 'flex';
+        biometricCredId = credId;
+      }
+    }
+  }catch(e){}
+}
+
+async function offerBiometric(){
+  try{
+    if(!window.PublicKeyCredential) return;
+    const avail = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+    if(!avail) return;
+    const existing = localStorage.getItem('qc_admin_biometric');
+    if(existing) return; // Already registered
+    setTimeout(()=>{
+      if(confirm('Would you like to use fingerprint or Windows Hello to sign in next time?')){
+        registerBiometric();
+      }
+    }, 500);
+  }catch(e){}
+}
+
+async function registerBiometric(){
+  try{
+    const cred = await navigator.credentials.create({
+      publicKey:{
+        challenge: crypto.getRandomValues(new Uint8Array(32)),
+        rp:{name:'Quick Credit Admin'},
+        user:{id:new Uint8Array(16),name:'admin',displayName:'Admin'},
+        pubKeyCredParams:[{alg:-7,type:'public-key'},{alg:-257,type:'public-key'}],
+        authenticatorSelection:{authenticatorAttachment:'platform',userVerification:'required'},
+        timeout:60000
+      }
+    });
+    if(cred){
+      localStorage.setItem('qc_admin_biometric', btoa(String.fromCharCode(...new Uint8Array(cred.rawId))));
+      alert('Fingerprint / Windows Hello registered! You can now use it to sign in.');
+    }
+  }catch(e){
+    console.log('Biometric registration failed:', e.message);
+  }
+}
+
+async function doBiometric(){
+  try{
+    const err = document.getElementById('login-err');
+    const credId = localStorage.getItem('qc_admin_biometric');
+    if(!credId){ err.textContent='No biometric registered.'; return; }
+    const rawId = Uint8Array.from(atob(credId), c=>c.charCodeAt(0));
+    const assertion = await navigator.credentials.get({
+      publicKey:{
+        challenge: crypto.getRandomValues(new Uint8Array(32)),
+        allowCredentials:[{id:rawId,type:'public-key'}],
+        userVerification:'required',
+        timeout:60000
+      }
+    });
+    if(assertion){
+      saveAdminSession();
+      document.getElementById('admin-login').style.display = 'none';
+      syncAll();
+    }
+  }catch(e){
+    document.getElementById('login-err').textContent = 'Biometric failed. Please use password.';
+  }
+}
+
 // INIT
 // ════════════════════════════
 if(window.innerWidth<900){document.getElementById('sidebar').classList.add('hidden');document.getElementById('main').classList.add('expanded');sidebarState='hidden';}
@@ -1169,7 +1341,7 @@ function showPage(name){
 // Init
 document.getElementById('topbar-date').textContent=new Date().toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
 document.getElementById('dash-stats').innerHTML=['','','',''].map(()=>'<div class="stat-card"><div class="stat-label">Syncing</div><div class="stat-value" style="color:var(--text4)">-</div></div>').join('');
-syncAll();
+if(checkAdminSession()) syncAll();
 </script>
 </body>
 </html>
