@@ -789,6 +789,41 @@ async function clearNotifs(){
   updateNotifBadge();
 }
 
+function editPayNetwork(){
+  const current=getBorrowerNetwork();
+  const modal=document.createElement('div');
+  modal.style.cssText='position:fixed;inset:0;background:rgba(5,10,18,.85);z-index:999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);';
+  modal.innerHTML=`<div style="background:var(--surface);border:1px solid var(--border2);border-radius:16px;padding:24px;width:90%;max-width:360px;font-family:'Inter',sans-serif">
+    <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:6px">Change Payment Network</div>
+    <div style="font-size:13px;color:var(--text3);margin-bottom:18px">Your loans will be sent and repaid via this network</div>
+    <div id="net-orange" onclick="selectNet('orange_money')" style="background:${current==='orange_money'?'rgba(249,115,22,.15)':'var(--surface2)'};border:2px solid ${current==='orange_money'?'#f97316':'var(--border)'};border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer;display:flex;align-items:center;gap:12px">
+      <span style="font-size:24px">🟠</span>
+      <div><div style="font-size:14px;font-weight:700;color:var(--text)">Orange Money</div><div style="font-size:12px;color:var(--text3)">Dial *144# · Number: +231760454803</div></div>
+      ${current==='orange_money'?'<span style="margin-left:auto;color:#f97316;font-weight:700">✓</span>':''}
+    </div>
+    <div id="net-lonestar" onclick="selectNet('lonestar')" style="background:${current==='lonestar'?'rgba(234,179,8,.15)':'var(--surface2)'};border:2px solid ${current==='lonestar'?'#eab308':'var(--border)'};border-radius:12px;padding:14px;margin-bottom:18px;cursor:pointer;display:flex;align-items:center;gap:12px">
+      <span style="font-size:24px">🟡</span>
+      <div><div style="font-size:14px;font-weight:700;color:var(--text)">Lonestar MTN</div><div style="font-size:12px;color:var(--text3)">Dial *156# · Number: ${SETS.lonestar_number||'contact admin'}</div></div>
+      ${current==='lonestar'?'<span style="margin-left:auto;color:#eab308;font-weight:700">✓</span>':''}
+    </div>
+    <button onclick="this.closest('div[style]').remove()" style="width:100%;padding:12px;background:transparent;border:1.5px solid var(--border);border-radius:10px;color:var(--text2);font-size:14px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif">Cancel</button>
+  </div>`;
+  document.body.appendChild(modal);
+  window._netModal=modal;
+}
+
+async function selectNet(network){
+  try{
+    await dbPatch('borrowers',{payment_network:network},`?id=eq.${BRW.id}`);
+    BRW.payment_network=network;
+    if(window._netModal) window._netModal.remove();
+    toast('Payment network updated to '+(network==='lonestar'?'Lonestar MTN':'Orange Money'));
+    rProfile();
+  }catch(e){
+    toast('Failed to update. Try again.',false);
+  }
+}
+
 function rProfile(){
   if(!BRW)return;
   const uP=creditP('USD'),lP=creditP('LRD');
@@ -812,7 +847,7 @@ function rProfile(){
     <div class="brow"><span class="blbl">USD Limit</span><span class="bval">$${fmt(uP.limit)}</span></div>
     <div class="brow"><span class="blbl">LRD Limit</span><span class="bval">L$${fmt(lP.limit)}</span></div>
     <div class="brow"><span class="blbl">Next Increase</span><span class="bval" style="color:var(--text3);font-size:12px">${nextIncrAt}</span></div>
-    <div class="brow"><span class="blbl">Payment Network</span><span class="bval">${getPayNetworkLabel()}</span></div>
+    <div class="brow"><span class="blbl">Payment Network</span><span class="bval">${getPayNetworkLabel()} <button onclick="editPayNetwork()" style="background:transparent;border:1px solid var(--border);border-radius:6px;padding:2px 8px;font-size:11px;color:var(--text3);cursor:pointer;font-family:'Inter',sans-serif;margin-left:6px;">Change</button></span></div>
     <div class="brow"><span class="blbl">Status</span><span class="bval">${BRW.approved?'<span style="color:var(--success)">✓ Approved</span>':'<span style="color:var(--gold)">⏳ Pending</span>'}</span></div>
   </div>
   <div class="card"><div class="ctitle">Personal Details</div>
