@@ -430,6 +430,8 @@ async function doLogin(){
   // Success — reset attempts
   await dbPatch('borrower_accounts',{login_attempts:0,locked_until:null},`?id=eq.${acc.id}`);
   warn.textContent='';
+  // Save session for 7 days
+  localStorage.setItem('qc_session',JSON.stringify({id:acc.id,phone:acc.phone,borrower_id:acc.borrower_id,expires:Date.now()+7*24*60*60*1000}));
   ME=acc;await loadData();showScreen('app');
 }
 
@@ -485,6 +487,7 @@ async function doRegister(){
   }
   const aRes=await dbPost('borrower_accounts',{borrower_id:bRes[0].id,phone,pin_hash:hash,login_attempts:0});
   if(!aRes||!aRes[0]){toast('Account creation failed.',false);return;}
+  localStorage.setItem('qc_session',JSON.stringify({id:aRes[0].id,phone:aRes[0].phone,borrower_id:aRes[0].borrower_id,expires:Date.now()+7*24*60*60*1000}));
   ME=aRes[0];await loadData();showScreen('app');toast('Account created! Awaiting admin approval.');
 }
 
@@ -827,6 +830,7 @@ function doLogout(){
   lpin.v='';updDots('ldots',0);loginAttempts=0;
   document.getElementById('lphone').value='';
   document.getElementById('attempt-warn').textContent='';
+  localStorage.removeItem('qc_session');
   showScreen('auth');
 }
 
@@ -842,9 +846,25 @@ document.addEventListener('keydown',e=>{
   else if(e.key==='Enter'){if(loginVisible)doLogin();else doRegister();}
 });
 
-window.addEventListener('load',()=>{
+window.addEventListener('load',async()=>{
   buildPad('lpad','ldots',lpin,null);
   buildPad('rpad','rdots',rpin,null);
+  // Check saved session
+  try{
+    const saved=localStorage.getItem('qc_session');
+    if(saved){
+      const session=JSON.parse(saved);
+      if(session.expires>Date.now()){
+        // Valid session — restore it
+        ME={id:session.id,phone:session.phone,borrower_id:session.borrower_id};
+        await loadData();
+        showScreen('app');
+        return;
+      } else {
+        localStorage.removeItem('qc_session');
+      }
+    }
+  }catch(e){}
   setTimeout(()=>showScreen('auth'),1800);
 });
 </script>
