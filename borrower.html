@@ -113,14 +113,15 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .brow:last-child{border-bottom:none;font-weight:700;font-size:15px;padding-top:10px;margin-top:4px;}
 .blbl{color:var(--text3);}
 .bval{font-weight:600;}
-.pin-dots{display:flex;gap:14px;justify-content:center;margin:16px 0;}
+.pin-wrap{position:relative;cursor:text;}
+.pin-dots{display:flex;gap:14px;justify-content:center;margin:8px 0 4px;}
 .pd{width:14px;height:14px;border-radius:50%;background:var(--surface3);border:2px solid var(--border);}
 .pd.filled{background:var(--blue2);border-color:var(--blue2);}
-.pin-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:280px;margin:0 auto;}
-.pk{background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:18px;text-align:center;font-size:22px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;}
-.pk:active{background:var(--blue);color:#fff;transform:scale(.95);}
-.pk.del{font-size:16px;color:var(--text3);}
-.pk.emp{background:transparent;border:none;pointer-events:none;}
+.pin-input{position:absolute;opacity:0;width:100%;height:100%;top:0;left:0;cursor:text;font-size:16px;}
+.pin-hint{font-size:11px;color:var(--text3);text-align:center;margin-bottom:8px;}
+/* Hide old keypad */
+.pin-pad{display:none!important;}
+.pk{display:none!important;}
 .profhdr{background:linear-gradient(135deg,#1a3a6e,#0d2044);border-radius:16px;padding:24px;text-align:center;margin-bottom:14px;}
 .avatar{width:72px;height:72px;border-radius:50%;background:var(--blue);display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:800;color:#fff;margin:0 auto 10px;}
 .profname{font-size:20px;font-weight:800;color:#fff;margin-bottom:4px;}
@@ -176,9 +177,12 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
     </div>
     <div id="auth-login">
       <div class="fg"><label>Phone Number</label><input type="tel" id="lphone" placeholder="+231 77 000 0000"/></div>
-      <label style="font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text3);display:block;margin-bottom:10px;">Enter PIN</label>
-      <div class="pin-dots" id="ldots"><div class="pd"></div><div class="pd"></div><div class="pd"></div><div class="pd"></div></div>
-      <div class="pin-pad" id="lpad"></div>
+      <label style="font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text3);display:block;margin-bottom:8px;">Enter PIN</label>
+      <div class="pin-wrap" onclick="document.getElementById('lpin-input').focus()">
+        <div class="pin-dots" id="ldots"><div class="pd"></div><div class="pd"></div><div class="pd"></div><div class="pd"></div></div>
+        <input type="password" inputmode="numeric" maxlength="4" id="lpin-input" class="pin-input" autocomplete="current-password" oninput="onPinInput('login',this.value)" onkeydown="if(event.key==='Enter')doLogin()"/>
+      </div>
+      <div class="pin-hint">Tap above and type your 4-digit PIN</div>
       <div class="attempt-warn" id="attempt-warn"></div>
       <button class="btn" onclick="doLogin()" style="margin-top:12px">Sign In</button>
     </div>
@@ -208,8 +212,11 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
         <div class="hint">Your ID photo will be reviewed by admin before approval</div>
       </div>
       <label style="font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text3);display:block;margin-bottom:8px;">Create 4-Digit PIN *</label>
-      <div class="pin-dots" id="rdots"><div class="pd"></div><div class="pd"></div><div class="pd"></div><div class="pd"></div></div>
-      <div class="pin-pad" id="rpad"></div>
+      <div class="pin-wrap" onclick="document.getElementById('rpin-input').focus()">
+        <div class="pin-dots" id="rdots"><div class="pd"></div><div class="pd"></div><div class="pd"></div><div class="pd"></div></div>
+        <input type="password" inputmode="numeric" maxlength="4" id="rpin-input" class="pin-input" autocomplete="new-password" oninput="onPinInput('register',this.value)"/>
+      </div>
+      <div class="pin-hint">Tap above and type your 4-digit PIN</div>
       <button class="btn" onclick="doRegister()" style="margin-top:14px">Create Account</button>
       <div class="alert ai" style="margin-top:12px">After registering, admin approval is required before applying for a loan.</div>
     </div>
@@ -369,6 +376,21 @@ function toast(msg,ok=true){
   clearTimeout(t._t);t._t=setTimeout(()=>t.style.opacity='0',3000);
 }
 
+function onPinInput(type, val){
+  // Only allow digits
+  const digits = val.replace(/\D/g,'').slice(0,4);
+  if(type==='login'){
+    lpin.v=digits;
+    document.getElementById('lpin-input').value=digits;
+    updDots('ldots',digits.length);
+    if(digits.length===4) doLogin();
+  } else {
+    rpin.v=digits;
+    document.getElementById('rpin-input').value=digits;
+    updDots('rdots',digits.length);
+  }
+}
+
 function buildPad(padId,dotsId,pinObj,onDone){
   const pad=document.getElementById(padId);if(!pad)return;pad.innerHTML='';
   ['1','2','3','4','5','6','7','8','9','','0','⌫'].forEach(k=>{
@@ -395,6 +417,9 @@ async function doLogin(){
   const phone=document.getElementById('lphone').value.trim();
   const warn=document.getElementById('attempt-warn');
   if(!phone.startsWith('+231')){toast('Enter your +231 Liberian number',false);return;}
+  // Sync from input field
+  const pinInput=document.getElementById('lpin-input');
+  if(pinInput&&pinInput.value.length===4) lpin.v=pinInput.value;
   if(lpin.v.length<4){toast('Enter your 4-digit PIN',false);return;}
 
   const accs=await dbGet('borrower_accounts',`?phone=eq.${encodeURIComponent(phone)}&select=*`);
@@ -407,7 +432,9 @@ async function doLogin(){
     if(new Date()<lockTime){
       const mins=Math.ceil((lockTime-new Date())/60000);
       warn.textContent=`Account locked. Try again in ${mins} minute${mins!==1?'s':''}.`;
-      lpin.v='';updDots('ldots',0);return;
+      lpin.v='';updDots('ldots',0);
+    const lpi2=document.getElementById('lpin-input');if(lpi2)lpi2.value='';
+    return;
     }
   }
 
@@ -424,7 +451,9 @@ async function doLogin(){
       await dbPatch('borrower_accounts',{login_attempts:attempts},`?id=eq.${acc.id}`);
       warn.textContent=`Wrong PIN. ${remaining} attempt${remaining!==1?'s':''} remaining.`;
     }
-    lpin.v='';updDots('ldots',0);return;
+    lpin.v='';updDots('ldots',0);
+    const lpi2=document.getElementById('lpin-input');if(lpi2)lpi2.value='';
+    return;
   }
 
   // Success — reset attempts
@@ -469,6 +498,8 @@ async function doRegister(){
   if(!name||!phone||!idnum||!gname||!gphone){toast('Fill all required fields',false);return;}
   if(!phone.startsWith('+231')){toast('Phone must be +231 Liberian number',false);return;}
   if(!gphone.startsWith('+231')){toast('Guarantor phone must be +231',false);return;}
+  const rpinInput=document.getElementById('rpin-input');
+  if(rpinInput&&rpinInput.value.length===4) rpin.v=rpinInput.value;
   if(rpin.v.length<4){toast('Create a 4-digit PIN',false);return;}
   const bl=await dbGet('blacklist',`?phone=eq.${encodeURIComponent(phone)}`);
   if(bl&&bl.length>0){toast('This number cannot register',false);return;}
@@ -864,6 +895,7 @@ function doLogout(){
   ME=null;BRW=null;LOANS=[];REPS=[];SETS={};APPS=[];NOTIFS=[];
   lpin.v='';updDots('ldots',0);loginAttempts=0;
   document.getElementById('lphone').value='';
+  const lpi=document.getElementById('lpin-input');if(lpi)lpi.value='';
   document.getElementById('attempt-warn').textContent='';
   localStorage.removeItem('qc_session');
   showScreen('auth');
